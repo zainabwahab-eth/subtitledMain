@@ -7,5 +7,6 @@ const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/yt-tra
 
 export async function connectDB(): Promise<void> {
   await mongoose.connect(MONGODB_URI);
-  console.log(`[db] Connected to MongoDB (${MONGODB_URI})`);
+  const host = mongoose.connection.host;
+  console.log(`[db] Connected to MongoDB (${host})`);
 }

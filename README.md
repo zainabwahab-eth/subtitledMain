@@ -1,5 +1,11 @@
 # subtitled. — YouTube → English Subtitle Translator
 
+![subtitled demo](./assets/demo.gif)
+
+**Live demo:** [subtitled.onrender.com](https://subtitled.onrender.com) *(free tier — first load may take ~50s if the server is asleep)*\
+
+**Stack:** Node.js · Express · TypeScript · React · Vite · MongoDB · Docker · Supadata · DeepL · OpenAI Whisper
+
 Paste a YouTube URL, get synced English subtitles — whether the video
 already has captions or not.
 
@@ -51,6 +57,27 @@ overlays the matching subtitle line based on the player's current time
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart TD
+    A[YouTube URL] --> B{In MongoDB cache?}
+    B -- yes --> H[Return cached transcript]
+    B -- no --> C{SUPADATA_API_KEY set?}
+    C -- "yes (production)" --> D[Supadata API<br/>native captions or AI-generated]
+    C -- "no (local dev)" --> E{Video has captions?}
+    E -- yes --> F[youtube-transcript-plus]
+    E -- no --> G[yt-dlp + Whisper<br/>transcribe + translate]
+    D --> I{English?}
+    F --> I
+    G --> J[Cache in MongoDB]
+    I -- no --> K[DeepL translation]
+    I -- yes --> J
+    K --> J
+    J --> L[React player + synced subtitle overlay]
+    H --> L
+```
+
 ## Project structure
 
 ```
@@ -76,6 +103,7 @@ yt-translator/
 
 ```bash
 cd backend
+cp .env.example .env
 npm install
 ```
 
@@ -131,6 +159,7 @@ In a separate terminal:
 ```bash
 cd frontend
 npm install
+cp .env.example .env
 npm run dev
 ```
 
