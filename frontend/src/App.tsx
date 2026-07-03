@@ -12,7 +12,7 @@ export default function App() {
   const [error, setError] = useState("");
   const [videoId, setVideoId] = useState<string | null>(null);
   const [segments, setSegments] = useState<TranscriptSegment[]>([]);
-  const [source, setSource] = useState<"captions" | "whisper" | null>(null);
+  const [source, setSource] = useState<"captions" | "whisper" | "supadata" | null>(null);
   const [showHistory, setShowHistory] = useState(false);
 
   async function loadTranscript(rawUrl: string) {
@@ -100,7 +100,10 @@ export default function App() {
         <>
           <VideoPlayer videoId={videoId} segments={segments} />
           <span className="source-tag">
-            SOURCE: <span className="accent">{source === "captions" ? "YOUTUBE CAPTIONS" : "WHISPER (AUDIO)"}</span>
+            SOURCE:{" "}
+            <span className="accent">
+              {source === "captions" ? "YOUTUBE CAPTIONS" : source === "supadata" ? "SUPADATA" : "WHISPER (AUDIO)"}
+            </span>
           </span>
         </>
       )}

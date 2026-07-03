@@ -4,7 +4,7 @@ export interface TranscriptSegment {
   duration: number;
 }
 
-export type TranscriptSource = "captions" | "whisper";
+export type TranscriptSource = "captions" | "whisper" | "supadata";
 
 export interface TranscriptResult {
   source: TranscriptSource;

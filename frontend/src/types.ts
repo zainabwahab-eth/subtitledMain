@@ -6,7 +6,7 @@ export interface TranscriptSegment {
 
 export interface TranscriptResponse {
   videoId: string;
-  source: "captions" | "whisper";
+  source: "captions" | "whisper" | "supadata";
   segments: TranscriptSegment[];
 }
 
@@ -14,6 +14,6 @@ export interface HistoryEntry {
   videoId: string;
   title: string;
   thumbnailUrl: string;
-  source: "captions" | "whisper";
+  source: "captions" | "whisper" | "supadata";
   createdAt: string;
 }

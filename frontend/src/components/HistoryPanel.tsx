@@ -61,7 +61,7 @@ export default function HistoryPanel({ onSelect, onClose }: Props) {
             <div className="history-card-info">
               <span className="history-title">{entry.title}</span>
               <span className="history-source">
-                {entry.source === "captions" ? "CAPTIONS" : "WHISPER"}
+                {entry.source === "captions" ? "CAPTIONS" : entry.source === "supadata" ? "SUPADATA" : "WHISPER"}
               </span>
             </div>
           </button>

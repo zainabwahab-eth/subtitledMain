@@ -5,6 +5,7 @@ import {
 } from "youtube-transcript-plus";
 import { fetchCaptions } from "../services/captionService";
 import { fetchViaWhisper } from "../services/whisperService";
+import { fetchViaSupadata } from "../services/supadataService";
 import { translateSegments } from "../services/translateService";
 import { getCachedVideo, cacheVideo } from "../services/videoCacheService";
 import { recordHistory } from "../services/historyService";
@@ -46,27 +47,32 @@ router.post("/transcript", async (req: Request, res: Response) => {
     } else {
       let pipelineResult: TranscriptResult;
 
-      // Fast path: does this video have captions at all?
-      try {
-        pipelineResult = await fetchCaptions(videoId);
-        console.log(
-          `[transcript] Captions found (source=${pipelineResult.source}, needsTranslation=${pipelineResult.needsTranslation})`
-        );
-      } catch (captionErr) {
-        // Video-level failures (unavailable, rate-limited) mean Whisper will also fail — re-throw.
-        if (
-          captionErr instanceof YoutubeTranscriptVideoUnavailableError ||
-          captionErr instanceof YoutubeTranscriptTooManyRequestError
-        ) {
-          throw captionErr;
+      if (process.env.SUPADATA_API_KEY) {
+        // Production path: Supadata handles everything (native captions + AI fallback).
+        // No Whisper fallback — Supadata's auto mode already covers the AI generation case,
+        // and yt-dlp/Whisper is blocked on our host anyway. Surface errors directly.
+        pipelineResult = await fetchViaSupadata(url);
+      } else {
+        // Local dev path: youtube-transcript-plus → Whisper fallback.
+        try {
+          pipelineResult = await fetchCaptions(videoId);
+          console.log(`[transcript] via captions (needsTranslation=${pipelineResult.needsTranslation})`);
+        } catch (captionErr) {
+          // Video-level failures mean Whisper will also fail — surface them directly.
+          if (
+            captionErr instanceof YoutubeTranscriptVideoUnavailableError ||
+            captionErr instanceof YoutubeTranscriptTooManyRequestError
+          ) {
+            throw captionErr;
+          }
+          // Captions disabled or not available — Whisper can still transcribe.
+          console.warn(
+            "[transcript] Caption fetch failed:",
+            captionErr instanceof Error ? captionErr.message : captionErr
+          );
+          console.log("[transcript] Falling back to Whisper. This may take a while...");
+          pipelineResult = await fetchViaWhisper(url);
         }
-        // Slow path: captions disabled or not available — Whisper can still transcribe.
-        console.warn(
-          "[transcript] Caption fetch failed:",
-          captionErr instanceof Error ? captionErr.message : captionErr
-        );
-        console.log("[transcript] Falling back to Whisper. This may take a while...");
-        pipelineResult = await fetchViaWhisper(url);
       }
 
       // Translate only if the text isn't already in English

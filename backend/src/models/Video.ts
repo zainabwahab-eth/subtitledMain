@@ -21,7 +21,7 @@ const segmentSchema = new Schema<TranscriptSegment>(
 
 const videoSchema = new Schema<VideoDocument>({
   videoId: { type: String, required: true, unique: true },
-  source: { type: String, enum: ["captions", "whisper"], required: true },
+  source: { type: String, enum: ["captions", "whisper", "supadata"], required: true },
   segments: { type: [segmentSchema], required: true },
   title: { type: String, required: true },
   thumbnailUrl: { type: String, required: true },
