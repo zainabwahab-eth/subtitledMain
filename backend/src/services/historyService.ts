@@ -15,9 +15,12 @@ export interface HistoryEntry {
  * bumps its createdAt instead of creating a duplicate row.
  */
 export async function recordHistory(sessionId: string, videoId: string): Promise<void> {
+  // $set so only createdAt is touched on existing entries (avoids replacement-doc
+  // edge cases with unique-index upserts). Filter fields are merged automatically
+  // on insert, so sessionId + videoId don't need repeating in the update.
   await History.findOneAndUpdate(
     { sessionId, videoId },
-    { sessionId, videoId, createdAt: new Date() },
+    { $set: { createdAt: new Date() } },
     { upsert: true }
   );
 }

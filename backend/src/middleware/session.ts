@@ -21,10 +21,17 @@ export function sessionMiddleware(req: Request, res: Response, next: NextFunctio
 
   if (!sessionId) {
     sessionId = crypto.randomUUID();
+
+    // In production the frontend and backend are on different domains, so the
+    // cookie must be SameSite=None + Secure (HTTPS) to survive cross-site
+    // fetch requests. SameSite=Lax works fine for same-origin local dev but
+    // the browser silently drops it on cross-site XHR/fetch in production.
+    const isProduction = process.env.NODE_ENV === "production";
     res.cookie(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       maxAge: ONE_YEAR_MS,
-      sameSite: "lax",
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
     });
   }
 

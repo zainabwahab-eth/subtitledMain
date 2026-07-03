@@ -8,25 +8,30 @@ export function getCachedVideo(videoId: string): Promise<VideoDocument | null> {
 
 /**
  * Persists a finished (already-translated) transcript so future requests
- * for the same videoId skip the caption/Whisper pipeline entirely. Fetches
- * title/thumbnail once via oEmbed since the pipeline doesn't otherwise need it.
+ * for the same videoId skip the caption/Whisper pipeline entirely.
+ * When prefetchedTitle / prefetchedThumbnailUrl are supplied (captions path),
+ * oEmbed is skipped entirely. Missing values fall back to an oEmbed call
+ * (Whisper path, or when youtube-transcript-plus returns no thumbnail).
  */
 export async function cacheVideo(
   videoId: string,
   source: TranscriptSource,
-  segments: TranscriptSegment[]
+  segments: TranscriptSegment[],
+  prefetchedTitle?: string,
+  prefetchedThumbnailUrl?: string,
 ): Promise<void> {
-  const metadata = await fetchVideoMetadata(videoId);
+  let title = prefetchedTitle;
+  let thumbnailUrl = prefetchedThumbnailUrl;
+
+  if (!title || !thumbnailUrl) {
+    const metadata = await fetchVideoMetadata(videoId);
+    title ??= metadata.title;
+    thumbnailUrl ??= metadata.thumbnailUrl;
+  }
 
   await Video.findOneAndUpdate(
     { videoId },
-    {
-      videoId,
-      source,
-      segments,
-      title: metadata.title,
-      thumbnailUrl: metadata.thumbnailUrl,
-    },
+    { videoId, source, segments, title, thumbnailUrl },
     { upsert: true }
   );
 }

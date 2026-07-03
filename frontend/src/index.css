@@ -257,9 +257,26 @@ body {
 }
 
 .history-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  display: flex;
+  flex-direction: row;
   gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.history-list::-webkit-scrollbar {
+  height: 4px;
+}
+
+.history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.history-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
 }
 
 .history-card {
@@ -272,6 +289,8 @@ body {
   overflow: hidden;
   cursor: pointer;
   padding: 0;
+  flex-shrink: 0;
+  width: 210px;
   transition: border-color 0.15s ease, transform 0.1s ease;
 }
 

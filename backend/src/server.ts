@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import mongoose from "mongoose";
 import { connectDB } from "./db";
 import { sessionMiddleware } from "./middleware/session";
 import transcriptRouter from "./routes/transcript";
@@ -23,8 +24,26 @@ app.use(sessionMiddleware);
 app.use("/api", transcriptRouter);
 app.use("/api", historyRouter);
 
+const DB_STATES: Record<number, string> = {
+  0: "disconnected",
+  1: "connected",
+  2: "connecting",
+  3: "disconnecting",
+};
+
+app.get("/", (_req, res) => {
+  res.json({ name: "subtitled. backend", version: "1.0.0" });
+});
+
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok" });
+  const dbState = mongoose.connection.readyState;
+  const db = DB_STATES[dbState] ?? "unknown";
+  const ok = dbState === 1;
+
+  res.status(ok ? 200 : 503).json({
+    status: ok ? "ok" : "degraded",
+    db,
+  });
 });
 
 connectDB()

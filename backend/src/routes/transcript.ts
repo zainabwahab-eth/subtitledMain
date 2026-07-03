@@ -1,4 +1,8 @@
 import { Router, Request, Response } from "express";
+import {
+  YoutubeTranscriptVideoUnavailableError,
+  YoutubeTranscriptTooManyRequestError,
+} from "youtube-transcript-plus";
 import { fetchCaptions } from "../services/captionService";
 import { fetchViaWhisper } from "../services/whisperService";
 import { translateSegments } from "../services/translateService";
@@ -48,9 +52,20 @@ router.post("/transcript", async (req: Request, res: Response) => {
         console.log(
           `[transcript] Captions found (source=${pipelineResult.source}, needsTranslation=${pipelineResult.needsTranslation})`
         );
-      } catch {
-        // Slow path: no captions -- fall back to Whisper on the full video URL
-        console.log("[transcript] No captions found, falling back to Whisper. This may take a while...");
+      } catch (captionErr) {
+        // Video-level failures (unavailable, rate-limited) mean Whisper will also fail — re-throw.
+        if (
+          captionErr instanceof YoutubeTranscriptVideoUnavailableError ||
+          captionErr instanceof YoutubeTranscriptTooManyRequestError
+        ) {
+          throw captionErr;
+        }
+        // Slow path: captions disabled or not available — Whisper can still transcribe.
+        console.warn(
+          "[transcript] Caption fetch failed:",
+          captionErr instanceof Error ? captionErr.message : captionErr
+        );
+        console.log("[transcript] Falling back to Whisper. This may take a while...");
         pipelineResult = await fetchViaWhisper(url);
       }
 
@@ -63,7 +78,7 @@ router.post("/transcript", async (req: Request, res: Response) => {
       result = { source: pipelineResult.source, segments: pipelineResult.segments };
 
       try {
-        await cacheVideo(videoId, result.source, result.segments);
+        await cacheVideo(videoId, result.source, result.segments, pipelineResult.videoTitle, pipelineResult.videoThumbnailUrl);
       } catch (cacheErr) {
         // Don't fail the request just because caching/oEmbed lookup failed.
         console.error("[transcript] Failed to cache video:", cacheErr);

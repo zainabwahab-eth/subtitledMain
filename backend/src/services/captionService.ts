@@ -1,37 +1,66 @@
-import { YoutubeTranscript } from "youtube-transcript";
+import {
+  fetchTranscript,
+  YoutubeTranscriptNotAvailableLanguageError,
+  YoutubeTranscriptVideoUnavailableError,
+  YoutubeTranscriptTooManyRequestError,
+} from "youtube-transcript-plus";
+import type { TranscriptResult as YtpResult, Thumbnail } from "youtube-transcript-plus";
 import { TranscriptResult, TranscriptSegment } from "../types";
 
-function toSegments(raw: { text: string; offset: number; duration: number }[]): TranscriptSegment[] {
-  return raw.map((r) => ({
-    text: r.text,
-    start: r.offset / 1000,
-    duration: r.duration / 1000,
+function mapSegments(pkgSegments: YtpResult["segments"]): TranscriptSegment[] {
+  return pkgSegments.map((s) => ({
+    text: s.text,
+    start: s.offset, // package field is 'offset', already in seconds
+    duration: s.duration,
   }));
 }
 
+function pickLargestThumbnail(thumbnails: Thumbnail[]): string | undefined {
+  if (thumbnails.length === 0) return undefined;
+  return [...thumbnails].sort((a, b) => b.width - a.width)[0].url;
+}
+
 /**
- * Tries to fetch captions that are already in English first (no translation needed).
- * Falls back to whatever caption track exists in the video's original language.
- * Throws if no captions exist at all -- caller should fall back to Whisper.
+ * Fetches captions via youtube-transcript-plus (Innertube API).
+ * Prefers an English track; falls back to any available track (sets needsTranslation).
+ * Throws on video-level errors (unavailable, rate-limited) so the caller does NOT
+ * fall through to Whisper — that would also fail for the same reasons.
+ * Throws on disabled/no-captions so the caller CAN fall through to Whisper.
  */
 export async function fetchCaptions(videoId: string): Promise<TranscriptResult> {
-  // 1. Try an English track directly -- cheapest, no translation step needed
+  let pkgResult: YtpResult;
+
   try {
-    const raw = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" });
-    return {
-      source: "captions",
-      needsTranslation: false,
-      segments: toSegments(raw),
-    };
-  } catch {
-    // no English track, fall through
+    // Step 1: English track
+    pkgResult = await fetchTranscript(videoId, { lang: "en", videoDetails: true, retries: 2 });
+  } catch (err) {
+    if (err instanceof YoutubeTranscriptNotAvailableLanguageError) {
+      // Step 2: English isn't available — take whatever track exists
+      pkgResult = await fetchTranscript(videoId, { videoDetails: true, retries: 2 });
+    } else if (err instanceof YoutubeTranscriptVideoUnavailableError) {
+      throw new Error(`Video unavailable or removed (videoId=${videoId})`);
+    } else if (err instanceof YoutubeTranscriptTooManyRequestError) {
+      throw new Error("YouTube is rate-limiting this server — try again in a few minutes");
+    } else {
+      // YoutubeTranscriptDisabledError, YoutubeTranscriptNotAvailableError, etc.
+      // Re-throw so the route can fall back to Whisper.
+      throw err;
+    }
   }
 
-  // 2. Fall back to the default/original-language track
-  const raw = await YoutubeTranscript.fetchTranscript(videoId);
+  if (pkgResult.segments.length === 0) {
+    throw new Error("Caption track returned no segments");
+  }
+
+  const segments = mapSegments(pkgResult.segments);
+  const firstLang = pkgResult.segments[0]?.lang ?? "";
+  const needsTranslation = !firstLang.startsWith("en");
+
   return {
     source: "captions",
-    needsTranslation: true,
-    segments: toSegments(raw),
+    needsTranslation,
+    segments,
+    videoTitle: pkgResult.videoDetails.title,
+    videoThumbnailUrl: pickLargestThumbnail(pkgResult.videoDetails.thumbnails),
   };
 }
