@@ -46,8 +46,17 @@ async function pollJob(jobId: string): Promise<Transcript> {
     const job = await client.transcript.getJobStatus(jobId);
 
     if (job.status === "completed") {
-      if (!job.result) throw new Error("Supadata job completed with no result");
-      return job.result;
+      // The SDK's JobResult<T> type declares a nested `result` field, but the
+      // actual completed-job response flattens the transcript fields (content/
+      // lang/availableLangs) directly onto the job object. Logged once so a
+      // future field-name mismatch doesn't require guessing again.
+      console.log("[transcript] Supadata job completed, raw response:", JSON.stringify(job));
+
+      const completed = job as unknown as Transcript;
+      if (completed.content === undefined) {
+        throw new Error("Supadata job completed with no content");
+      }
+      return completed;
     }
     if (job.status === "failed") {
       throw new Error(job.error?.message ?? "Supadata transcript job failed");
